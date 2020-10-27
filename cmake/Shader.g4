@@ -30,6 +30,7 @@ property
 	| property_double3
 	| property_double4
 	| property_2D
+	| property_3D
 	| property_cube
 	| property_rgb
 	| property_rgba
@@ -56,6 +57,7 @@ property_double2 : property_name '(' display_name ',' 'double2' ')' ':' val_doub
 property_double3 : property_name '(' display_name ',' 'double3' ')' ':' val_double3;
 property_double4 : property_name '(' display_name ',' 'double4' ')' ':' val_double4;
 property_2D : property_name '(' display_name ',' '2D' ')' ':' val_tex2d;
+property_3D : property_name '(' display_name ',' '3D' ')' ':' val_tex3d;
 property_cube : property_name '(' display_name ',' 'Cube' ')' ':' val_texcube;
 property_rgb : property_name '(' display_name ',' 'Color3' ')' ':' val_float3;
 property_rgba : property_name '(' display_name ',' 'Color4' ')' ':' val_float4;
@@ -94,6 +96,14 @@ default_texture_2d
 	: 'White'
 	| 'Black'
 	| 'Bump'
+	;
+val_tex3d
+	: default_texture_3d
+	| StringLiteral
+	;
+default_texture_3d
+	: 'White'
+	| 'Black'
 	;
 val_texcube
 	: default_texture_cube

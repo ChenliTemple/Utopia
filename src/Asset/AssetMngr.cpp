@@ -10,6 +10,7 @@
 #include <Utopia/Render/Shader.h>
 #include <Utopia/Core/Image.h>
 #include <Utopia/Render/Texture2D.h>
+#include <Utopia/Render/Texture3D.h>
 #include <Utopia/Render/TextureCube.h>
 #include <Utopia/Render/Material.h>
 #include <Utopia/Core/TextAsset.h>
@@ -128,6 +129,7 @@ bool AssetMngr::IsSupported(std::string_view ext) const noexcept {
 		|| ext == "hlsl"
 		|| ext == "shader"
 		|| ext == "tex2d"
+		|| ext == "tex3d"
 		|| ext == "texcube"
 		|| ext == "mat"
 		|| ext == "scene"
@@ -359,6 +361,17 @@ std::shared_ptr<Object> AssetMngr::LoadAsset(const std::filesystem::path& path) 
 		pImpl->path2assert.emplace_hint(target, path, Impl::Asset{ tex2d });
 		pImpl->assetID2path.emplace(tex2d->GetInstanceID(), path);
 		return tex2d;
+	}
+	else if (ext == ".tex3d") {
+		auto tex3dJSON = Impl::LoadJSON(path);
+		auto guidstr = tex3dJSON["image"].GetString();
+		xg::Guid guid{ guidstr };
+		auto imgTarget = pImpl->guid2path.find(guid);
+		auto tex3d = std::make_shared<Texture3D>();
+		tex3d->image = imgTarget != pImpl->guid2path.end() ? LoadAsset<Image>(imgTarget->second) : nullptr;
+		pImpl->path2assert.emplace_hint(target, path, Impl::Asset{ tex3d });
+		pImpl->assetID2path.emplace(tex3d->GetInstanceID(), path);
+		return tex3d;
 	}
 	else if (ext == ".texcube") {
 		auto texcubeJSON = Impl::LoadJSON(path);

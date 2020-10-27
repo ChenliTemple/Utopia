@@ -7,6 +7,7 @@
 
 namespace Ubpa::Utopia {
 	struct Texture2D;
+	struct Texture3D;
 	class TextureCube;
 	struct Shader;
 	class Mesh;
@@ -30,6 +31,13 @@ namespace Ubpa::Utopia {
 		);
 
 		RsrcMngrDX12& UnregisterTexture2D(const Texture2D& tex2D);
+
+		RsrcMngrDX12& RegisterTexture3D(
+			DirectX::ResourceUploadBatch& upload,
+			const Texture3D& tex3D
+		);
+
+		RsrcMngrDX12& UnregisterTexture3D(const Texture3D& tex3D);
 
 		RsrcMngrDX12& RegisterTextureCube(
 			DirectX::ResourceUploadBatch& upload,
@@ -61,9 +69,12 @@ namespace Ubpa::Utopia {
 
 		D3D12_CPU_DESCRIPTOR_HANDLE GetTexture2DSrvCpuHandle(const Texture2D& tex2D) const;
 		D3D12_GPU_DESCRIPTOR_HANDLE GetTexture2DSrvGpuHandle(const Texture2D& tex2D) const;
+		D3D12_CPU_DESCRIPTOR_HANDLE GetTexture3DSrvCpuHandle(const Texture3D& tex3D) const;
+		D3D12_GPU_DESCRIPTOR_HANDLE GetTexture3DSrvGpuHandle(const Texture3D& tex3D) const;
 		D3D12_CPU_DESCRIPTOR_HANDLE GetTextureCubeSrvCpuHandle(const TextureCube& texcube) const;
 		D3D12_GPU_DESCRIPTOR_HANDLE GetTextureCubeSrvGpuHandle(const TextureCube& texcube) const;
 		ID3D12Resource* GetTexture2DResource(const Texture2D& tex2D) const;
+		ID3D12Resource* GetTexture3DResource(const Texture3D& tex3D) const;
 		ID3D12Resource* GetTextureCubeResource(const TextureCube& texcube) const;
 
 		UDX12::MeshGPUBuffer& GetMeshGPUBuffer(const Mesh& mesh) const;

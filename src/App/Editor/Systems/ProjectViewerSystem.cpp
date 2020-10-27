@@ -207,7 +207,7 @@ namespace Ubpa::Utopia::detail {
 						) {
 						id = modelID.ptr;
 					}
-					else if (ext == ".texcube")
+					else if (ext == ".texcube" || ext == ".tex3d")
 						id = texcubeID.ptr;
 					else
 						id = fileID.ptr;

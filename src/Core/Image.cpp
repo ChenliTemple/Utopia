@@ -24,19 +24,20 @@ Image::Image(const std::string& path, bool flip) {
 	Init(path, flip);
 }
 
-Image::Image(size_t width, size_t height, size_t channel) {
-	Init(width, height, channel);
+Image::Image(size_t width, size_t height, size_t channel, size_t depth) {
+	Init(width, height, channel, depth);
 }
 
-Image::Image(size_t width, size_t height, size_t channel, const float* data) {
-	Init(width, height, channel, data);
+Image::Image(size_t width, size_t height, size_t channel, size_t depth, const float* data) {
+	Init(width, height, channel, depth, data);
 }
 
 Image::Image(Image&& image) noexcept :
 	data{ image.data },
 	width{ image.width },
 	height{ image.height },
-	channel{ image.channel }
+	channel{ image.channel },
+	depth{ image.depth }
 {
 	image.data = nullptr;
 	image.Clear();
@@ -45,10 +46,11 @@ Image::Image(Image&& image) noexcept :
 Image::Image(const Image& image) :
 	width{ image.width },
 	height{ image.height },
-	channel{ image.channel }
+	channel{ image.channel },
+	depth{ image.depth }
 {
-	data = new float[width * height * channel];
-	memcpy(data, image.data, width* height* channel * sizeof(float));
+	data = new float[width * height * depth * channel];
+	memcpy(data, image.data, width* height* channel* depth * sizeof(float));
 }
 
 Image& Image::operator=(Image&& image) noexcept {
@@ -59,6 +61,7 @@ Image& Image::operator=(Image&& image) noexcept {
 	width = image.width;
 	height = image.height;
 	channel = image.channel;
+	depth = image.depth;
 	return *this;
 }
 
@@ -69,8 +72,9 @@ Image& Image::operator=(const Image& image) {
 	width = image.width;
 	height = image.height;
 	channel = image.channel;
-	data = new float[width * height * channel];
-	memcpy(data, image.data, width * height * channel * sizeof(float));
+	depth = image.depth;
+	data = new float[width * height * channel * depth];
+	memcpy(data, image.data, width * height * channel * depth * sizeof(float));
 	return *this;
 }
 
@@ -104,26 +108,29 @@ bool Image::Init(const std::string& path, bool flip) {
 	return true;
 }
 
-void Image::Init(size_t width, size_t height, size_t channel) {
+void Image::Init(size_t width, size_t height, size_t channel, size_t depth) {
 	Clear();
 	this->width = width;
 	this->height = height;
 	this->channel = channel;
-	data = new float[width * height * channel]{ 0.f };
+	this->depth = depth;
+	data = new float[width * height * channel * depth]{ 0.f };
 }
 
-void Image::Init(size_t width, size_t height, size_t channel, const float* data) {
+void Image::Init(size_t width, size_t height, size_t channel, size_t depth, const float* data) {
 	Clear();
 	this->width = width;
 	this->height = height;
 	this->channel = channel;
-	this->data = new float[width * height * channel];
-	memcpy(this->data, data, width * height * channel * sizeof(float));
+	this->depth = depth;
+	this->data = new float[width * height * channel * depth];
+	memcpy(this->data, data, width * height * channel * depth * sizeof(float));
 }
 
-bool Image::Save(const std::string& path, bool flip) const {
+bool Image::Save(const std::string& path, bool flip, size_t depthIdx) const {
 	assert(IsValid());
 	assert(!path.empty());
+	assert(depthIdx < depth);
 
 	string supports[5] = { "png", "bmp", "tga", "jpg", "hdr" };
 
@@ -137,7 +144,7 @@ bool Image::Save(const std::string& path, bool flip) const {
 			break;
 		}
 	}
-
+	auto buffer = data + width * height * channel * depthIdx;
 	int w = static_cast<int>(width);
 	int h = static_cast<int>(height);
 	int c = static_cast<int>(channel);
@@ -146,7 +153,7 @@ bool Image::Save(const std::string& path, bool flip) const {
 		size_t num = width * height * channel;
 		stbi_uc* stbi_data = new stbi_uc[num];
 		for (size_t i = 0; i < num; i++)
-			stbi_data[i] = static_cast<stbi_uc>(std::clamp(data[i] * 255.f, 0.f, 255.f));
+			stbi_data[i] = static_cast<stbi_uc>(std::clamp(buffer[i] * 255.f, 0.f, 255.f));
 
 		int rst;
 		if (k == 0)
@@ -164,7 +171,7 @@ bool Image::Save(const std::string& path, bool flip) const {
 			return false;
 	}
 	else if (k == 4) {
-		int rst = stbi_write_hdr(path.c_str(), w, h, c, data);
+		int rst = stbi_write_hdr(path.c_str(), w, h, c, buffer);
 		if (rst == 0)
 			return false;
 	}
@@ -175,32 +182,34 @@ bool Image::Save(const std::string& path, bool flip) const {
 }
 
 void Image::Clear() {
-	delete data;
-	data = nullptr;
 	width = static_cast<size_t>(0);
 	height = static_cast<size_t>(0);
 	channel = static_cast<size_t>(0);
+	depth = static_cast<size_t>(1);
+
+	delete data;
+	data = nullptr;
 }
 
 bool Image::IsValid() const noexcept {
 	return data != nullptr;
 }
 
-float& Image::At(size_t x, size_t y, size_t c) {
+float& Image::At(size_t x, size_t y, size_t c, size_t d) {
 	assert(IsValid());
-	assert(x < width&& y < height&& c < channel);
-	return data[(y * width + x) * channel + c];
+	assert(x < width && y < height && c < channel && d < depth);
+	return data[((d * depth + y) * width + x) * channel + c];
 }
 
-const float& Image::At(size_t x, size_t y, size_t c) const {
+const float& Image::At(size_t x, size_t y, size_t c, size_t d) const {
 	assert(IsValid());
-	assert(x < width&& y < height&& c < channel);
-	return data[(y * width + x) * channel + c];
+	assert(x < width && y < height && c < channel && d < depth);
+	return data[((d * depth + y) * width + x) * channel + c];
 }
 
-const rgbaf Image::At(size_t x, size_t y) const {
+const rgbaf Image::At(size_t x, size_t y, size_t d) const {
 	assert(IsValid());
-	assert(x < width&& y < height);
+	assert(x < width && y < height && d < depth);
 
 	rgbaf rst{ 0.f,0.f,0.f,1.f };
 

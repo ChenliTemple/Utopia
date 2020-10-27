@@ -19,6 +19,7 @@
 #include <Utopia/Render/DX12/RsrcMngrDX12.h>
 #include <Utopia/Render/DX12/StdPipeline.h>
 #include <Utopia/Render/Texture2D.h>
+#include <Utopia/Render/Texture3D.h>
 #include <Utopia/Render/TextureCube.h>
 #include <Utopia/Render/Shader.h>
 #include <Utopia/Render/Material.h>

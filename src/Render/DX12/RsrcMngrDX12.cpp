@@ -1,6 +1,7 @@
 #include <Utopia/Render/DX12/RsrcMngrDX12.h>
 
 #include <Utopia/Render/Texture2D.h>
+#include <Utopia/Render/Texture3D.h>
 #include <Utopia/Render/TextureCube.h>
 #include <Utopia/Core/Image.h>
 #include <Utopia/Render/HLSLFile.h>
@@ -20,6 +21,10 @@ struct RsrcMngrDX12::Impl {
 		UDX12::DescriptorHeapAllocation allocationSRV;
 	};
 	struct TextureCubeGPUData {
+		ID3D12Resource* resource;
+		UDX12::DescriptorHeapAllocation allocationSRV;
+	};
+	struct Texture3DGPUData {
 		ID3D12Resource* resource;
 		UDX12::DescriptorHeapAllocation allocationSRV;
 	};
@@ -45,6 +50,7 @@ struct RsrcMngrDX12::Impl {
 	UDX12::ResourceDeleteBatch deleteBatch;
 
 	unordered_map<size_t, Texture2DGPUData> texture2DMap;
+	unordered_map<size_t, Texture3DGPUData> texture3DMap;
 	unordered_map<size_t, TextureCubeGPUData> textureCubeMap;
 	unordered_map<size_t, RenderTargetGPUData> renderTargetMap;
 	unordered_map<size_t, ShaderCompileData> shaderMap;
@@ -133,6 +139,11 @@ void RsrcMngrDX12::Clear() {
 		tex.resource->Release();
 	}
 
+	for (auto& [name, tex] : pImpl->texture3DMap) {
+		UDX12::DescriptorHeapMngr::Instance().GetCSUGpuDH()->Free(move(tex.allocationSRV));
+		tex.resource->Release();
+	}
+
 	for (auto& [name, tex] : pImpl->textureCubeMap) {
 		UDX12::DescriptorHeapMngr::Instance().GetCSUGpuDH()->Free(move(tex.allocationSRV));
 		tex.resource->Release();
@@ -152,6 +163,7 @@ void RsrcMngrDX12::Clear() {
 	delete pImpl->upload;
 
 	pImpl->texture2DMap.clear();
+	pImpl->texture3DMap.clear();
 	pImpl->textureCubeMap.clear();
 	pImpl->renderTargetMap.clear();
 	pImpl->meshMap.clear();
@@ -360,13 +372,22 @@ RsrcMngrDX12& RsrcMngrDX12::RegisterTextureCube(
 //}
 
 D3D12_CPU_DESCRIPTOR_HANDLE RsrcMngrDX12::GetTexture2DSrvCpuHandle(const Texture2D& tex2D) const {
-	return pImpl->texture2DMap.find(tex2D.GetInstanceID())->second.allocationSRV.GetCpuHandle(0);
+	return pImpl->texture2DMap.at(tex2D.GetInstanceID()).allocationSRV.GetCpuHandle(0);
 }
 D3D12_GPU_DESCRIPTOR_HANDLE RsrcMngrDX12::GetTexture2DSrvGpuHandle(const Texture2D& tex2D) const {
-	return pImpl->texture2DMap.find(tex2D.GetInstanceID())->second.allocationSRV.GetGpuHandle(0);
+	return pImpl->texture2DMap.at(tex2D.GetInstanceID()).allocationSRV.GetGpuHandle(0);
 }
 ID3D12Resource* RsrcMngrDX12::GetTexture2DResource(const Texture2D& tex2D) const {
-	return pImpl->texture2DMap.find(tex2D.GetInstanceID())->second.resource;
+	return pImpl->texture2DMap.at(tex2D.GetInstanceID()).resource;
+}
+D3D12_CPU_DESCRIPTOR_HANDLE RsrcMngrDX12::GetTexture3DSrvCpuHandle(const Texture3D& tex3D) const {
+	return pImpl->texture3DMap.at(tex3D.GetInstanceID()).allocationSRV.GetCpuHandle(0);
+}
+D3D12_GPU_DESCRIPTOR_HANDLE RsrcMngrDX12::GetTexture3DSrvGpuHandle(const Texture3D& tex3D) const {
+	return pImpl->texture3DMap.at(tex3D.GetInstanceID()).allocationSRV.GetGpuHandle(0);
+}
+ID3D12Resource* RsrcMngrDX12::GetTexture3DResource(const Texture3D& tex3D) const {
+	return pImpl->texture3DMap.at(tex3D.GetInstanceID()).resource;
 }
 D3D12_CPU_DESCRIPTOR_HANDLE RsrcMngrDX12::GetTextureCubeSrvCpuHandle(const TextureCube& texCube) const {
 	return pImpl->textureCubeMap.find(texCube.GetInstanceID())->second.allocationSRV.GetCpuHandle(0);
@@ -741,6 +762,64 @@ ID3D12RootSignature* RsrcMngrDX12::GetShaderRootSignature(const Shader& shader) 
 //
 //	return *this;
 //}
+
+RsrcMngrDX12& RsrcMngrDX12::RegisterTexture3D(
+	DirectX::ResourceUploadBatch& upload,
+	const Texture3D& tex3D
+) {
+	auto target = pImpl->texture3DMap.find(tex3D.GetInstanceID());
+	if (target != pImpl->texture3DMap.end())
+		return *this;
+
+	Impl::Texture3DGPUData tex;
+
+	tex.allocationSRV = UDX12::DescriptorHeapMngr::Instance().GetCSUGpuDH()->Allocate(static_cast<uint32_t>(1));
+
+	constexpr DXGI_FORMAT channelMap[] = {
+		DXGI_FORMAT::DXGI_FORMAT_R32_FLOAT,
+		DXGI_FORMAT::DXGI_FORMAT_R32G32_FLOAT,
+		DXGI_FORMAT::DXGI_FORMAT_R32G32B32_FLOAT,
+		DXGI_FORMAT::DXGI_FORMAT_R32G32B32A32_FLOAT,
+	};
+
+	size_t w = tex3D.image->width;
+	size_t h = tex3D.image->height;
+	size_t c = tex3D.image->channel;
+	size_t d = tex3D.image->depth;
+
+	D3D12_SUBRESOURCE_DATA data;
+	data.pData = tex3D.image->data;
+	data.RowPitch = w * c * sizeof(float);
+	data.SlicePitch = h * data.RowPitch;
+	DirectX::CreateTextureFromMemory(
+		pImpl->device,
+		upload,
+		w, h, d,
+		channelMap[c - 1],
+		data,
+		&tex.resource
+	);
+
+	pImpl->device->CreateShaderResourceView(
+		tex.resource,
+		&UDX12::Desc::SRV::Tex3D(tex.resource->GetDesc().Format),
+		tex.allocationSRV.GetCpuHandle(static_cast<uint32_t>(0))
+	);
+
+	pImpl->texture3DMap.emplace_hint(target, std::make_pair(tex3D.GetInstanceID(), move(tex)));
+
+	return *this;
+}
+
+RsrcMngrDX12& RsrcMngrDX12::UnregisterTexture3D(const Texture3D& tex3D) {
+	if (auto target = pImpl->texture3DMap.find(tex3D.GetInstanceID()); target == pImpl->texture3DMap.end()) {
+		auto& tex = target->second;
+		UDX12::DescriptorHeapMngr::Instance().GetCSUGpuDH()->Free(move(tex.allocationSRV));
+		tex.resource->Release();
+		pImpl->texture3DMap.erase(target);
+	}
+	return *this;
+}
 
 size_t RsrcMngrDX12::RegisterPSO(const D3D12_GRAPHICS_PIPELINE_STATE_DESC* desc) {
 	ID3D12PipelineState* pso;

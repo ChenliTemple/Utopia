@@ -9,6 +9,7 @@
 
 namespace Ubpa::Utopia {
 	struct Texture2D;
+	struct Texture3D;
 	class TextureCube;
 
 	using ShaderProperty = std::variant<
@@ -35,6 +36,7 @@ namespace Ubpa::Utopia {
 		rgbf,                              // 20, color (RGB)
 		rgbaf,                             // 21, color (RGBA)
 		std::shared_ptr<const Texture2D>,  // 22, Texture 2D
-		std::shared_ptr<const TextureCube> // 23, Texture Cube
+		std::shared_ptr<const Texture3D>,  // 23, Texture 3D
+		std::shared_ptr<const TextureCube> // 24, Texture Cube
 	>;
 }

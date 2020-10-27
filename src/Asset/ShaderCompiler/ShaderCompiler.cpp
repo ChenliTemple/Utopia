@@ -7,6 +7,7 @@
 #include <Utopia/Asset/AssetMngr.h>
 #include <Utopia/Render/HLSLFile.h>
 #include <Utopia/Render/Texture2D.h>
+#include <Utopia/Render/Texture3D.h>
 #include <Utopia/Render/TextureCube.h>
 
 using namespace Ubpa::Utopia;
@@ -426,6 +427,44 @@ struct ShaderCompiler::Impl {
 				return ERROR;
 			}
 			return std::const_pointer_cast<const Texture2D>(tex2d);
+		}
+
+		virtual antlrcpp::Any visitVal_tex3d(details::ShaderParser::Val_tex3dContext* ctx) override {
+			static const std::shared_ptr<const Texture2D> ERROR;
+			xg::Guid guid;
+			if (ctx->default_texture_3d()) {
+				auto name = ctx->default_texture_3d()->getText();
+				if (name == "White")
+					guid = xg::Guid{ "1936ed7e-6896-4ace-abd9-5b084fcfb891" };
+				else if (name == "Black")
+					guid = xg::Guid{ "ece48884-cc0d-4288-be5e-c58a6d2ea187" };
+				else {
+					assert(false);
+					success = false;
+					return ERROR;
+				}
+
+			}
+			else {
+				auto guid_s = ctx->StringLiteral()->getText();
+				guid = xg::Guid{ StringLiteralContentView(guid_s) };
+			}
+
+			if (!guid.isValid()) {
+				success = false;
+				return ERROR;
+			}
+			const auto& path = AssetMngr::Instance().GUIDToAssetPath(guid);
+			if (path.empty()) {
+				success = false;
+				return ERROR;
+			}
+			auto tex3d = AssetMngr::Instance().LoadAsset<Texture3D>(path);
+			if (!tex3d) {
+				success = false;
+				return ERROR;
+			}
+			return std::const_pointer_cast<const Texture3D>(tex3d);
 		}
 
 		virtual antlrcpp::Any visitProperty_cube(details::ShaderParser::Property_cubeContext* ctx) override {
